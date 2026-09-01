@@ -1,9 +1,18 @@
-// TeraCloud Video Dashboard Controller
+// TeraCloud Admin Dashboard Controller
+let adminToken = localStorage.getItem('teracloud_admin_token') || '';
+
 let currentPage = 1;
 let currentLimit = 24;
 let currentView = 'grid';
 let hlsInstance = null;
 let activeStreamFile = null;
+
+// Auth DOM
+const loginOverlay = document.getElementById('login-overlay');
+const formAdminLogin = document.getElementById('form-admin-login');
+const inputAdminPassword = document.getElementById('input-admin-password');
+const adminApp = document.getElementById('admin-app');
+const btnAdminLogout = document.getElementById('btn-admin-logout');
 
 // DOM Elements
 const statTotalFiles = document.getElementById('stat-total-files');
@@ -58,7 +67,58 @@ function showToast(message, type = 'info') {
     }, 4000);
 }
 
-// Fallback Copy to Clipboard (Support HTTP/HTTPS di VPS/IP)
+// Check & Handle Auth State
+function checkAuthState() {
+    if (adminToken) {
+        loginOverlay.style.display = 'none';
+        adminApp.style.display = 'flex';
+        loadStats();
+        loadFiles(1);
+    } else {
+        loginOverlay.style.display = 'flex';
+        adminApp.style.display = 'none';
+    }
+}
+
+// Login Form Submit
+formAdminLogin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const password = inputAdminPassword.value.trim();
+
+    try {
+        const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            adminToken = data.token;
+            localStorage.setItem('teracloud_admin_token', adminToken);
+            showToast('Login berhasil!', 'success');
+            checkAuthState();
+        } else {
+            showToast(data.error || 'Password salah!', 'error');
+            inputAdminPassword.value = '';
+            inputAdminPassword.focus();
+        }
+    } catch (err) {
+        showToast('Gagal login: ' + err.message, 'error');
+    }
+});
+
+// Logout
+btnAdminLogout.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (confirm('Keluar dari panel admin?')) {
+        adminToken = '';
+        localStorage.removeItem('teracloud_admin_token');
+        checkAuthState();
+    }
+});
+
+// Fallback Copy to Clipboard
 function copyTextToClipboard(text) {
     if (navigator.clipboard && window.isSecureContext) {
         return navigator.clipboard.writeText(text);
@@ -78,7 +138,6 @@ function copyTextToClipboard(text) {
     }
 }
 
-// Quick Copy Stream URL from Card / Action
 function copyStreamUrlByFileId(fileId) {
     const streamUrl = `${window.location.origin}/api/stream/${fileId}`;
     copyTextToClipboard(streamUrl).then(() => {
@@ -88,10 +147,18 @@ function copyStreamUrlByFileId(fileId) {
     });
 }
 
-// 1. Fetch Stats & System Status
+// 1. Fetch Stats & System Status (With Auth Header)
 async function loadStats() {
     try {
-        const res = await fetch('/api/stats');
+        const res = await fetch('/api/stats', {
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (res.status === 401) {
+            adminToken = '';
+            localStorage.removeItem('teracloud_admin_token');
+            checkAuthState();
+            return;
+        }
         const data = await res.json();
         if (data.success) {
             statTotalFiles.innerText = (data.stats.totalFiles || 0).toLocaleString();
@@ -114,7 +181,7 @@ async function loadStats() {
     }
 }
 
-// 2. Fetch Video List from Database (CRUD Read)
+// 2. Fetch Video List from Database
 async function loadFiles(page = 1) {
     currentPage = page;
     const search = inputSearch.value.trim();
@@ -344,7 +411,10 @@ document.getElementById('form-edit-file').addEventListener('submit', async (e) =
     try {
         const res = await fetch(`/api/files/${fileId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminToken}`
+            },
             body: JSON.stringify({ title, category: 'video' })
         });
         const data = await res.json();
@@ -365,7 +435,10 @@ async function deleteFileRecord(fileId) {
     if (!confirm('Apakah Anda yakin ingin menghapus video ini dari database?')) return;
 
     try {
-        const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
+        const res = await fetch(`/api/files/${fileId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
         const data = await res.json();
         if (data.success) {
             showToast('Video berhasil dihapus dari database', 'success');
@@ -455,7 +528,7 @@ document.getElementById('form-fetch-link').addEventListener('submit', (e) => {
     const url = input.value.trim();
     const originalHtml = `<i class="fa-solid fa-bolt"></i> Fetch Videos`;
 
-    const streamUrl = `/api/fetch/link/stream?url=${encodeURIComponent(url)}`;
+    const streamUrl = `/api/fetch/link/stream?url=${encodeURIComponent(url)}&key=${encodeURIComponent(adminToken)}`;
     startSSEFetchStream(streamUrl, btn, originalHtml);
 });
 
@@ -467,7 +540,7 @@ document.getElementById('form-fetch-folder').addEventListener('submit', (e) => {
     const folderPath = input.value.trim();
     const originalHtml = `<i class="fa-solid fa-folder-open"></i> Scan & Sync Videos`;
 
-    const streamUrl = `/api/fetch/folder/stream?folderPath=${encodeURIComponent(folderPath)}&recursive=true`;
+    const streamUrl = `/api/fetch/folder/stream?folderPath=${encodeURIComponent(folderPath)}&recursive=true&key=${encodeURIComponent(adminToken)}`;
     startSSEFetchStream(streamUrl, btn, originalHtml);
 });
 
@@ -477,7 +550,7 @@ document.getElementById('btn-fetch-all-account').addEventListener('click', () =>
     const btn = document.getElementById('btn-fetch-all-account');
     const originalHtml = `<i class="fa-solid fa-wand-magic-sparkles"></i> Start Full Video Sync`;
 
-    const streamUrl = `/api/fetch/account/stream`;
+    const streamUrl = `/api/fetch/account/stream?key=${encodeURIComponent(adminToken)}`;
     startSSEFetchStream(streamUrl, btn, originalHtml);
 });
 
@@ -501,7 +574,10 @@ document.getElementById('form-save-cookie').addEventListener('submit', async (e)
     try {
         const res = await fetch('/api/cookie', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminToken}`
+            },
             body: JSON.stringify({ cookie })
         });
         const data = await res.json();
@@ -588,6 +664,5 @@ document.getElementById('btn-refresh-stats').addEventListener('click', () => {
     showToast('Data video berhasil disegarkan', 'info');
 });
 
-// Initialize on load
-loadStats();
-loadFiles(1);
+// Start & Check Auth
+checkAuthState();

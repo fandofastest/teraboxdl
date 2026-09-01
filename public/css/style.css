@@ -78,6 +78,58 @@ body::after {
     pointer-events: none;
 }
 
+/* Login Overlay */
+.login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(11, 15, 25, 0.95);
+    backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.login-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 36px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+    text-align: center;
+}
+
+.login-header .login-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 22px;
+    margin: 0 auto 16px auto;
+    box-shadow: var(--shadow-glow);
+}
+
+.login-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.login-header p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+}
+
 /* Layout */
 .app-container {
     display: flex;
@@ -572,9 +624,6 @@ body::after {
 }
 
 .card-badge.video { background: rgba(59, 130, 246, 0.85); color: #fff; }
-.card-badge.image { background: rgba(16, 185, 129, 0.85); color: #fff; }
-.card-badge.audio { background: rgba(245, 158, 11, 0.85); color: #fff; }
-.card-badge.other { background: rgba(100, 116, 139, 0.85); color: #fff; }
 
 .play-overlay-btn {
     position: absolute;

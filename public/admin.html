@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeraCloud - Terabox Video Admin Dashboard</title>
+    
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- HLS.js for Video Streaming -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- Login Modal (Jika Belum Login Password) -->
+<div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+        <div class="login-header">
+            <div class="login-icon"><i class="fa-solid fa-lock"></i></div>
+            <h2>Admin Authentication</h2>
+            <p>Masukkan master password untuk mengakses dashboard admin</p>
+        </div>
+        <form id="form-admin-login">
+            <div style="margin-bottom: 18px;">
+                <input type="password" id="input-admin-password" class="form-control" placeholder="Masukkan Password..." required autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;" id="btn-submit-login">
+                <i class="fa-solid fa-right-to-bracket"></i> Masuk ke Admin
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="app-container" id="admin-app" style="display: none;">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo-area">
+            <div class="logo-icon">
+                <i class="fa-solid fa-play"></i>
+            </div>
+            <div class="logo-text">
+                <h1>TeraCloud</h1>
+                <span>ADMIN PANEL</span>
+            </div>
+        </div>
+
+        <ul class="nav-links">
+            <li class="nav-item active">
+                <a href="#" id="nav-dashboard"><i class="fa-solid fa-layer-group"></i> <span>Dashboard</span></a>
+            </li>
+            <li class="nav-item">
+                <a href="#" id="nav-fetch"><i class="fa-solid fa-bolt"></i> <span>Fetch Video Engine</span></a>
+            </li>
+            <li class="nav-item">
+                <a href="#" id="nav-files"><i class="fa-solid fa-film"></i> <span>Video Collection</span></a>
+            </li>
+            <li class="nav-item">
+                <a href="/" target="_blank"><i class="fa-solid fa-globe"></i> <span>Public Watch Page</span></a>
+            </li>
+            <li class="nav-item">
+                <a href="/api-docs" target="_blank" id="nav-api-docs"><i class="fa-solid fa-book"></i> <span>Swagger API Docs</span></a>
+            </li>
+            <li class="nav-item">
+                <a href="#" id="nav-settings"><i class="fa-solid fa-sliders"></i> <span>Settings & Cookie</span></a>
+            </li>
+            <li class="nav-item">
+                <a href="#" id="btn-admin-logout" style="color: var(--danger);"><i class="fa-solid fa-arrow-right-from-bracket"></i> <span>Logout</span></a>
+            </li>
+        </ul>
+
+        <div class="user-status-card" id="user-status-box">
+            <div class="user-avatar">
+                <i class="fa-solid fa-user"></i>
+            </div>
+            <div class="user-details">
+                <h4 id="user-name">Memeriksa Akun...</h4>
+                <div class="status-badge" id="account-status">Checking</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Header -->
+        <header class="top-header">
+            <div class="header-title">
+                <h2>Video Cloud Admin</h2>
+                <p>Platform streaming video HLS otomatis & indexer Terabox ke MongoDB</p>
+            </div>
+            <div class="header-actions">
+                <a href="/" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">
+                    <i class="fa-solid fa-eye"></i> View Public
+                </a>
+                <a href="/api-docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">
+                    <i class="fa-solid fa-code"></i> API Docs
+                </a>
+                <button class="btn btn-secondary btn-sm" id="btn-refresh-stats">
+                    <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                </button>
+                <button class="btn btn-primary btn-sm" id="btn-quick-fetch">
+                    <i class="fa-solid fa-plus"></i> Fetch Link
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon purple">
+                    <i class="fa-solid fa-video"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="stat-total-videos">0</h3>
+                    <p>Total Video Ready</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fa-solid fa-play"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="stat-total-files">0</h3>
+                    <p>Stream Endpoints Active</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon pink">
+                    <i class="fa-solid fa-hard-drive"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="stat-total-size">0 B</h3>
+                    <p>Total Video Size</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon emerald">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="stat-db-type">MongoDB</h3>
+                    <p>Storage Engine</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fetch Operations Panel -->
+        <section class="fetch-panel" id="fetch-section">
+            <div class="fetch-tabs">
+                <button class="tab-btn active" data-tab="tab-link">
+                    <i class="fa-solid fa-link"></i> Fetch Share Link (Video)
+                </button>
+                <button class="tab-btn" data-tab="tab-folder">
+                    <i class="fa-solid fa-folder-tree"></i> Fetch Account Folder (Video Only)
+                </button>
+                <button class="tab-btn" data-tab="tab-all-account">
+                    <i class="fa-solid fa-arrows-spin"></i> Fetch All Account Videos
+                </button>
+            </div>
+
+            <!-- Tab 1: Fetch Link -->
+            <div class="tab-content active" id="tab-link">
+                <form id="form-fetch-link">
+                    <div class="input-group">
+                        <input type="url" class="form-control" id="input-fetch-link" placeholder="Tempelkan link Terabox (misal: https://1024terabox.com/s/1xxxxxxx)..." required>
+                        <button type="submit" class="btn btn-primary" id="btn-submit-link">
+                            <i class="fa-solid fa-bolt"></i> Fetch Videos
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tab 2: Fetch Folder -->
+            <div class="tab-content" id="tab-folder">
+                <form id="form-fetch-folder">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="input-fetch-folder" placeholder="Masukkan Path Folder Akun (contoh: /syumildee atau /)..." value="/" required>
+                        <button type="submit" class="btn btn-primary" id="btn-submit-folder">
+                            <i class="fa-solid fa-folder-open"></i> Scan & Sync Videos
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tab 3: Fetch All Files -->
+            <div class="tab-content" id="tab-all-account">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <p style="color: var(--text-muted); font-size: 14px;">
+                        Pindai seluruh folder di akun Terabox Anda dan <strong>hanya simpan file video</strong> ke database MongoDB secara otomatis.
+                    </p>
+                    <button type="button" class="btn btn-primary" id="btn-fetch-all-account">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Start Full Video Sync
+                    </button>
+                </div>
+            </div>
+
+            <!-- Real-time Progress Bar Box -->
+            <div id="fetch-progress-container" style="display: none; margin-top: 20px; padding: 16px; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span id="progress-status-text" style="font-size: 13px; font-weight: 600; color: #fff;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Memulai ekstraksi video...
+                    </span>
+                    <span id="progress-count-text" style="font-size: 13px; color: var(--primary); font-weight: 700;">0 Video Ditemukan</span>
+                </div>
+                <div style="width: 100%; height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 4px; overflow: hidden; position: relative;">
+                    <div id="progress-bar-fill" style="width: 0%; height: 100%; background: var(--accent-gradient); border-radius: 4px; transition: width 0.3s ease;"></div>
+                </div>
+                <div id="progress-log-text" style="margin-top: 8px; font-size: 12px; color: var(--text-muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    Menunggu respons server...
+                </div>
+            </div>
+        </section>
+
+        <!-- Controls Bar -->
+        <section class="controls-bar">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" class="form-control" id="input-search" placeholder="Cari judul video atau folder...">
+            </div>
+
+            <div class="filters-group">
+                <select class="select-filter" id="select-sort">
+                    <option value="newest">Terbaru</option>
+                    <option value="oldest">Terlama</option>
+                    <option value="size_desc">Ukuran (Terbesar)</option>
+                    <option value="size_asc">Ukuran (Terkecil)</option>
+                    <option value="title_asc">Judul (A-Z)</option>
+                </select>
+
+                <div class="view-toggle">
+                    <button class="view-btn active" id="btn-view-grid" title="Grid View"><i class="fa-solid fa-grip"></i></button>
+                    <button class="view-btn" id="btn-view-table" title="Table View"><i class="fa-solid fa-list"></i></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Files Container (Grid & Table) -->
+        <section id="files-grid-container" class="files-grid">
+            <!-- Rendered by JS -->
+        </section>
+
+        <section id="files-table-container" class="files-table-wrap">
+            <table class="files-table">
+                <thead>
+                    <tr>
+                        <th>Thumbnail</th>
+                        <th>Judul Video</th>
+                        <th>Ukuran</th>
+                        <th>Folder / Path</th>
+                        <th>Tanggal Tambah</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="files-table-body">
+                    <!-- Rendered by JS -->
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination-container">
+            <!-- Rendered by JS -->
+        </div>
+    </main>
+</div>
+
+<!-- Modal: Video Player -->
+<div class="modal" id="modal-player">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-player-title">Video Stream Player</h3>
+            <button class="modal-close" id="btn-close-player"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="player-container">
+                <video id="video-element" controls autoplay playsinline></video>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+                <span id="player-file-size" style="font-size: 13px; color: var(--text-muted);">Ukuran: -</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary btn-sm" id="btn-copy-stream-url"><i class="fa-solid fa-copy"></i> Copy Stream API</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit File Metadata -->
+<div class="modal" id="modal-edit">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3>Edit Judul Video</h3>
+            <button class="modal-close" id="btn-close-edit"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="form-edit-file">
+                <input type="hidden" id="edit-file-id">
+                <div style="margin-bottom: 18px;">
+                    <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-muted);">Judul Video</label>
+                    <input type="text" class="form-control" id="edit-file-title" required>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-edit">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Cookie & Settings -->
+<div class="modal" id="modal-settings">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-header">
+            <h3>Pengaturan Cookie Terabox</h3>
+            <button class="modal-close" id="btn-close-settings"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+                Masukkan cookie akun Terabox Anda (format Netscape ataupun key=value seperti <code>ndus=xxxx;</code>).
+            </p>
+            <form id="form-save-cookie">
+                <textarea class="form-control" id="input-cookie-text" rows="8" placeholder="# Netscape HTTP Cookie File atau ndus=xxxx..." style="font-family: monospace; font-size: 12px; margin-bottom: 16px;"></textarea>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-settings">Tutup</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Simpan Cookie</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- JavaScript App -->
+<script src="/js/app.js"></script>
+</body>
+</html>
