@@ -10,6 +10,9 @@ const teraboxService = require('./services/teraboxService');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Percayai reverse proxy seperti Nginx / Cloudflare agar req.protocol dan host akurat
+app.set('trust proxy', true);
+
 // Penyimpanan URL segmen TS dalam memori agar query URL pendek & aman
 const tsUrlStore = new Map();
 
@@ -255,7 +258,7 @@ app.delete('/api/files/:id', async (req, res) => {
     }
 });
 
-// 12. Dynamic Auto-Refreshing Stream Proxy Endpoint (Anti-Expired)
+// 12. Dynamic Auto-Refreshing Stream Proxy Endpoint (Anti-Expired & Mixed-Content Proof)
 app.get('/api/stream/:id', async (req, res) => {
     try {
         const file = await dbService.getFileById(req.params.id);
@@ -284,7 +287,6 @@ app.get('/api/stream/:id', async (req, res) => {
             return res.status(400).send('Invalid video manifest');
         }
 
-        const host = req.protocol + '://' + req.get('host');
         const lines = m3u8Content.split('\n');
 
         const rewrittenLines = lines.map((line, idx) => {
@@ -298,7 +300,8 @@ app.get('/api/stream/:id', async (req, res) => {
                     tsUrlStore.delete(firstKey);
                 }
 
-                return `${host}/api/ts/${segKey}`;
+                // Gunakan relative path /api/ts/... agar otomatis mengikuti HTTPS domain tanpa hardcode http://
+                return `/api/ts/${segKey}`;
             }
             return line;
         });
