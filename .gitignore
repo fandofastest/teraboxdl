@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+
+# Credentials & Cookies
+cookie.txt
+
+# Local Data & Downloads
+data/
+downloads/
+*.db
+*.log
+
+# Python cache & virtualenv
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
