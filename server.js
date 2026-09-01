@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger');
 const dbService = require('./services/dbService');
 const teraboxService = require('./services/teraboxService');
 
@@ -18,6 +20,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Inisialisasi Database
 dbService.initDB();
+
+// ==================== SWAGGER API DOCS ====================
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: "TeraCloud API Documentation (OpenAPI)"
+}));
 
 // ==================== REST API ENDPOINTS ====================
 
@@ -346,5 +354,6 @@ app.listen(PORT, () => {
     console.log(`\n==================================================`);
     console.log(`🚀 Terabox Admin & Streaming Server Active!`);
     console.log(`🌐 Local URL: http://localhost:${PORT}`);
+    console.log(`📚 Swagger API Docs: http://localhost:${PORT}/api-docs`);
     console.log(`==================================================\n`);
 });
