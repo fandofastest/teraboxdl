@@ -1,4 +1,4 @@
-// TeraCloud TikTok-Style Video Stream & Vertical Swipe Controller
+// TeraCloud TikTok-Style Video Stream & Global Swipe Controller
 let publicVideos = [];
 let currentVideoIndex = -1;
 let currentPublicPage = 1;
@@ -7,7 +7,9 @@ let publicHls = null;
 
 // Touch / Vertical Swipe Tracking
 let touchStartY = 0;
+let touchStartX = 0;
 let touchEndY = 0;
+let touchEndX = 0;
 let isSwiping = false;
 
 // Wheel debounce for desktop mouse wheel navigation
@@ -235,46 +237,49 @@ function animateVerticalTransition(direction) {
     }, 250);
 }
 
-// Touch Gesture Listeners (TikTok Vertical Swipe: Swipe UP = Next, Swipe DOWN = Prev)
-playerStage.addEventListener('touchstart', (e) => {
+// Global Touch Listeners on Window so Fullscreen Video Touch is Always Captured
+window.addEventListener('touchstart', (e) => {
+    if (!playerOverlay.classList.contains('active')) return;
     touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
     isSwiping = true;
-}, { passive: true });
+}, { passive: true, capture: true });
 
-playerStage.addEventListener('touchmove', (e) => {
-    if (!isSwiping) return;
+window.addEventListener('touchmove', (e) => {
+    if (!playerOverlay.classList.contains('active') || !isSwiping) return;
     const currentY = e.touches[0].clientY;
     const deltaY = currentY - touchStartY;
-    // Realtime slight resistance drag effect
     if (Math.abs(deltaY) < 120) {
         publicVideoElement.style.transform = `translateY(${deltaY * 0.4}px)`;
     }
-}, { passive: true });
+}, { passive: true, capture: true });
 
-playerStage.addEventListener('touchend', (e) => {
-    if (!isSwiping) return;
+window.addEventListener('touchend', (e) => {
+    if (!playerOverlay.classList.contains('active') || !isSwiping) return;
     isSwiping = false;
     touchEndY = e.changedTouches[0].clientY;
+    touchEndX = e.changedTouches[0].clientX;
     
     const diffY = touchEndY - touchStartY;
+    const diffX = touchEndX - touchStartX;
 
-    if (Math.abs(diffY) > 50) {
+    // Pastikan gestur swipe vertikal lebih dominan dari swipe horizontal
+    if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 40) {
         if (diffY < 0) {
-            // Geser ke Atas (Swipe UP) -> Next Video (TikTok style)
+            // Swipe Ke Atas -> Next Video
             nextVideo();
         } else {
-            // Geser ke Bawah (Swipe DOWN) -> Prev Video
+            // Swipe Ke Bawah -> Prev Video
             prevVideo();
         }
     } else {
-        // Reset jika swipe terlalu pendek
         publicVideoElement.style.transform = 'translateY(0)';
     }
-}, { passive: true });
+}, { passive: true, capture: true });
 
-// Mouse Wheel Navigation (Scroll Up / Down di Laptop/PC)
-playerStage.addEventListener('wheel', (e) => {
-    e.preventDefault();
+// Mouse Wheel Navigation
+window.addEventListener('wheel', (e) => {
+    if (!playerOverlay.classList.contains('active')) return;
     if (isWheelScrolling) return;
 
     isWheelScrolling = true;
@@ -287,9 +292,9 @@ playerStage.addEventListener('wheel', (e) => {
     setTimeout(() => {
         isWheelScrolling = false;
     }, 600);
-}, { passive: false });
+}, { passive: true, capture: true });
 
-// Keyboard Navigation (Panah Atas / Bawah / Space / Esc)
+// Keyboard Navigation
 window.addEventListener('keydown', (e) => {
     if (!playerOverlay.classList.contains('active')) return;
 
