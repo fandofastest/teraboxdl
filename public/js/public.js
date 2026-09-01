@@ -1,15 +1,17 @@
-// TeraCloud Public Video Stream & Swipe Navigation Controller
+// TeraCloud TikTok-Style Video Stream & Vertical Swipe Controller
 let publicVideos = [];
 let currentVideoIndex = -1;
 let currentPublicPage = 1;
 let totalPublicPages = 1;
 let publicHls = null;
 
-// Touch / Swipe Tracking Variables
-let touchStartX = 0;
+// Touch / Vertical Swipe Tracking
 let touchStartY = 0;
-let touchEndX = 0;
 let touchEndY = 0;
+let isSwiping = false;
+
+// Wheel debounce for desktop mouse wheel navigation
+let isWheelScrolling = false;
 
 // DOM
 const publicVideoGrid = document.getElementById('public-video-grid');
@@ -141,7 +143,7 @@ function renderPublicPagination(current, total) {
     publicPagination.innerHTML = html;
 }
 
-// 4. Open Public Video Player
+// 4. Open TikTok Player
 function openPublicPlayer(index) {
     if (!publicVideos || index < 0 || index >= publicVideos.length) return;
 
@@ -149,7 +151,7 @@ function openPublicPlayer(index) {
     const video = publicVideos[index];
 
     currentVideoTitle.innerText = video.title;
-    currentVideoMeta.innerText = `${index + 1} dari ${publicVideos.length} Video`;
+    currentVideoMeta.innerText = `${index + 1} / ${publicVideos.length}`;
 
     playerOverlay.classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -204,70 +206,98 @@ function closePublicPlayer() {
     publicVideoElement.src = '';
 }
 
-// 5. Swipe & Next / Prev Navigation
+// 5. Vertical Next / Prev Video (TikTok Style)
 function nextVideo() {
     if (currentVideoIndex < publicVideos.length - 1) {
-        animateSwipeTransition('left');
+        animateVerticalTransition('up');
         openPublicPlayer(currentVideoIndex + 1);
     } else {
-        showToast('Sudah di video terakhir');
+        showToast('Sudah di video paling akhir');
     }
 }
 
 function prevVideo() {
     if (currentVideoIndex > 0) {
-        animateSwipeTransition('right');
+        animateVerticalTransition('down');
         openPublicPlayer(currentVideoIndex - 1);
     } else {
-        showToast('Sudah di video pertama');
+        showToast('Sudah di video paling awal');
     }
 }
 
-function animateSwipeTransition(direction) {
-    const offset = direction === 'left' ? '-40px' : '40px';
-    publicVideoElement.style.transform = `translateX(${offset})`;
-    publicVideoElement.style.opacity = '0.5';
+function animateVerticalTransition(direction) {
+    const offset = direction === 'up' ? '-80px' : '80px';
+    publicVideoElement.style.transform = `translateY(${offset})`;
+    publicVideoElement.style.opacity = '0.3';
     setTimeout(() => {
-        publicVideoElement.style.transform = 'translateX(0)';
+        publicVideoElement.style.transform = 'translateY(0)';
         publicVideoElement.style.opacity = '1';
-    }, 200);
+    }, 250);
 }
 
-// Touch Gesture Listeners (Swipe Support)
+// Touch Gesture Listeners (TikTok Vertical Swipe: Swipe UP = Next, Swipe DOWN = Prev)
 playerStage.addEventListener('touchstart', (e) => {
-    touchStartX = e.changedTouches[0].screenX;
-    touchStartY = e.changedTouches[0].screenY;
+    touchStartY = e.touches[0].clientY;
+    isSwiping = true;
+}, { passive: true });
+
+playerStage.addEventListener('touchmove', (e) => {
+    if (!isSwiping) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY;
+    // Realtime slight resistance drag effect
+    if (Math.abs(deltaY) < 120) {
+        publicVideoElement.style.transform = `translateY(${deltaY * 0.4}px)`;
+    }
 }, { passive: true });
 
 playerStage.addEventListener('touchend', (e) => {
-    touchEndX = e.changedTouches[0].screenX;
-    touchEndY = e.changedTouches[0].screenY;
-    handleSwipeGesture();
-}, { passive: true });
-
-function handleSwipeGesture() {
-    const diffX = touchEndX - touchStartX;
+    if (!isSwiping) return;
+    isSwiping = false;
+    touchEndY = e.changedTouches[0].clientY;
+    
     const diffY = touchEndY - touchStartY;
 
-    // Pastikan swipe horizontal lebih dominan daripada scroll vertikal
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 45) {
-        if (diffX < 0) {
-            // Swipe ke Kiri -> Video Selanjutnya
+    if (Math.abs(diffY) > 50) {
+        if (diffY < 0) {
+            // Geser ke Atas (Swipe UP) -> Next Video (TikTok style)
             nextVideo();
         } else {
-            // Swipe ke Kanan -> Video Sebelumnya
+            // Geser ke Bawah (Swipe DOWN) -> Prev Video
             prevVideo();
         }
+    } else {
+        // Reset jika swipe terlalu pendek
+        publicVideoElement.style.transform = 'translateY(0)';
     }
-}
+}, { passive: true });
 
-// Keyboard Navigation (Arrow Left, Right, Esc)
+// Mouse Wheel Navigation (Scroll Up / Down di Laptop/PC)
+playerStage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (isWheelScrolling) return;
+
+    isWheelScrolling = true;
+    if (e.deltaY > 30) {
+        nextVideo();
+    } else if (e.deltaY < -30) {
+        prevVideo();
+    }
+
+    setTimeout(() => {
+        isWheelScrolling = false;
+    }, 600);
+}, { passive: false });
+
+// Keyboard Navigation (Panah Atas / Bawah / Space / Esc)
 window.addEventListener('keydown', (e) => {
     if (!playerOverlay.classList.contains('active')) return;
 
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
         nextVideo();
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
         prevVideo();
     } else if (e.key === 'Escape') {
         closePublicPlayer();

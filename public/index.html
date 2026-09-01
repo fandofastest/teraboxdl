@@ -56,7 +56,7 @@
     </div>
 </main>
 
-<!-- Fullscreen Mobile / Desktop Video Player with Swipe Next/Prev -->
+<!-- Fullscreen TikTok-Style Vertical Video Player with Vertical Swipe Next/Prev -->
 <div class="player-overlay" id="player-overlay">
     <div class="player-header">
         <div class="player-info">
@@ -66,24 +66,31 @@
         <button class="btn-close-player" id="btn-close-player" title="Tutup"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
-    <!-- Swipeable Video Stage -->
+    <!-- TikTok-Style Swipeable Video Stage -->
     <div class="player-stage" id="player-stage">
-        <video id="public-video-element" playsinline controls autoplay></video>
+        <video id="public-video-element" playsinline controls autoplay loop></video>
 
-        <!-- Navigation Buttons Desktop / On-Screen -->
-        <button class="nav-arrow prev" id="btn-prev-video" title="Video Sebelumnya (Swipe Kanan / Tombol Atas)">
-            <i class="fa-solid fa-chevron-left"></i>
-        </button>
-        <button class="nav-arrow next" id="btn-next-video" title="Video Selanjutnya (Swipe Kiri / Tombol Bawah)">
-            <i class="fa-solid fa-chevron-right"></i>
-        </button>
+        <!-- Vertical TikTok Action Bar (Samping Kanan) -->
+        <div class="tiktok-actions">
+            <button class="tiktok-action-btn" id="btn-prev-video" title="Video Sebelumnya (Swipe Bawah)">
+                <i class="fa-solid fa-chevron-up"></i>
+                <span>Prev</span>
+            </button>
+            <button class="tiktok-action-btn" id="btn-next-video" title="Video Selanjutnya (Swipe Atas)">
+                <i class="fa-solid fa-chevron-down"></i>
+                <span>Next</span>
+            </button>
+            <button class="tiktok-action-btn" id="btn-copy-public-link" title="Bagikan Video">
+                <i class="fa-solid fa-share-nodes"></i>
+                <span>Share</span>
+            </button>
+        </div>
     </div>
 
     <div class="player-footer">
         <div class="swipe-hint">
-            <i class="fa-solid fa-arrows-left-right"></i> Swipe kiri/kanan atau tekan panah keyboard untuk Next/Prev
+            <i class="fa-solid fa-arrows-up-down"></i> Swipe ke Atas / Bawah untuk ganti video (seperti TikTok)
         </div>
-        <button class="btn-copy-link" id="btn-copy-public-link"><i class="fa-solid fa-share-nodes"></i> Bagikan</button>
     </div>
 </div>
 
