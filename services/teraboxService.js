@@ -128,11 +128,8 @@ async function getFreshStreamUrl(fileDoc) {
             const res = await fetch(apiUrl, { headers });
             const data = await res.json();
 
-            if (data.errno === 0 && data.list && data.list.length > 0) {
-                const targetFsId = fileDoc.fs_id;
-                const matchItem = data.list.find(item => String(item.fs_id) === String(targetFsId)) || data.list[0];
-
-                return `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${data.uk}&shareid=${data.shareid}&type=M3U8_AUTO_480&fid=${matchItem.fs_id}&sign=${data.sign}&timestamp=${data.timestamp}`;
+            if (data.errno === 0) {
+                return `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${data.uk}&shareid=${data.shareid}&type=M3U8_AUTO_480&fid=${fileDoc.fs_id}&sign=${data.sign}&timestamp=${data.timestamp}`;
             }
         }
     }
@@ -141,9 +138,9 @@ async function getFreshStreamUrl(fileDoc) {
 }
 
 /**
- * 1. Fetch File Dari Link Share Publik/Privat
+ * 1. Fetch File Dari Link Share (Support Single File & Folder Share Rekursif)
  */
-async function fetchLink(link) {
+async function fetchLink(link, onProgress = null) {
     const cookie = parseCookieFile();
     const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
@@ -164,6 +161,7 @@ async function fetchLink(link) {
         throw new Error("Format link Terabox tidak valid atau surl tidak ditemukan.");
     }
 
+    // 1. Ambil info root dari share link
     const apiUrl = `https://www.terabox.app/api/shorturlinfo?shorturl=${surl}&root=1`;
     const res = await fetch(apiUrl, { headers });
     const data = await res.json();
@@ -177,35 +175,119 @@ async function fetchLink(link) {
     const sign = data.sign;
     const timestamp = data.timestamp;
 
-    const files = data.list.map(item => {
-        const cat = determineCategory(item.server_filename, item.category);
-        const streamUrl = cat === 'video' 
-            ? `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${uk}&shareid=${shareid}&type=M3U8_AUTO_480&fid=${item.fs_id}&sign=${sign}&timestamp=${timestamp}`
-            : '';
+    const allFiles = [];
 
-        const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
+    // Fungsi rekursif untuk scan subfolder di dalam link share
+    async function scanShareList(dirPath = '', rootFlag = 1) {
+        let page = 1;
+        let hasMore = true;
 
-        return {
-            fs_id: String(item.fs_id),
-            title: item.server_filename || 'file_download',
-            category: cat,
-            size: Number(item.size) || 0,
-            size_formatted: formatSize(item.size),
-            thumbnail: thumb,
-            stream_url: streamUrl,
-            share_url: link,
-            surl: surl,
-            dlink: item.dlink || '',
-            path: item.path || '/',
-            source_type: 'link',
-            shareid: String(shareid),
-            uk: String(uk),
-            sign: String(sign),
-            timestamp: Number(timestamp)
-        };
-    });
+        if (onProgress) {
+            onProgress({
+                status: 'scanning',
+                currentDir: dirPath || '/',
+                filesFound: allFiles.length,
+                message: `Memindai isi share: ${dirPath || 'Root folder'} (Ditemukan: ${allFiles.length} file)...`
+            });
+        }
 
-    return files;
+        while (hasMore) {
+            let listUrl = `https://www.terabox.app/share/list?app_id=250528&web=1&channel=dubox&clienttype=0&shorturl=${surl}&num=100&page=${page}&by=name&order=asc`;
+            if (rootFlag === 1) {
+                listUrl += `&root=1`;
+            } else {
+                listUrl += `&dir=${encodeURIComponent(dirPath)}&root=0`;
+            }
+
+            try {
+                const rList = await fetch(listUrl, { headers });
+                const listData = await rList.json();
+
+                if (listData.errno === 0 && listData.list && listData.list.length > 0) {
+                    for (const item of listData.list) {
+                        if (item.isdir === 1 || item.isdir === '1') {
+                            // Rekursif ke dalam subfolder
+                            await scanShareList(item.path, 0);
+                        } else {
+                            const cat = determineCategory(item.server_filename, item.category);
+                            const streamUrl = cat === 'video'
+                                ? `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${uk}&shareid=${shareid}&type=M3U8_AUTO_480&fid=${item.fs_id}&sign=${sign}&timestamp=${timestamp}`
+                                : '';
+
+                            const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
+
+                            allFiles.push({
+                                fs_id: String(item.fs_id),
+                                title: item.server_filename || 'file_download',
+                                category: cat,
+                                size: Number(item.size) || 0,
+                                size_formatted: formatSize(item.size),
+                                thumbnail: thumb,
+                                stream_url: streamUrl,
+                                share_url: link,
+                                surl: surl,
+                                dlink: item.dlink || '',
+                                path: item.path || '/',
+                                source_type: 'link',
+                                shareid: String(shareid),
+                                uk: String(uk),
+                                sign: String(sign),
+                                timestamp: Number(timestamp)
+                            });
+                        }
+                    }
+
+                    if (listData.list.length < 100) {
+                        hasMore = false;
+                    } else {
+                        page++;
+                    }
+                } else {
+                    hasMore = false;
+                }
+            } catch (e) {
+                hasMore = false;
+            }
+        }
+    }
+
+    // Cek apakah ada item berjenis folder di response root
+    const hasDirectory = data.list.some(item => item.isdir === 1 || item.isdir === '1');
+
+    if (hasDirectory) {
+        await scanShareList('', 1);
+    } else {
+        // Single / Multi files langsung di root
+        for (const item of data.list) {
+            const cat = determineCategory(item.server_filename, item.category);
+            const streamUrl = cat === 'video' 
+                ? `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${uk}&shareid=${shareid}&type=M3U8_AUTO_480&fid=${item.fs_id}&sign=${sign}&timestamp=${timestamp}`
+                : '';
+
+            const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
+
+            allFiles.push({
+                fs_id: String(item.fs_id),
+                title: item.server_filename || 'file_download',
+                category: cat,
+                size: Number(item.size) || 0,
+                size_formatted: formatSize(item.size),
+                thumbnail: thumb,
+                stream_url: streamUrl,
+                share_url: link,
+                surl: surl,
+                dlink: item.dlink || '',
+                path: item.path || '/',
+                source_type: 'link',
+                shareid: String(shareid),
+                uk: String(uk),
+                sign: String(sign),
+                timestamp: Number(timestamp)
+            });
+        }
+    }
+
+    return allFiles;
 }
 
 /**

@@ -78,7 +78,7 @@ app.get('/api/folders', async (req, res) => {
     }
 });
 
-// 4. Fetch Link (Single / Multi)
+// 4. Fetch Link (Single / Multi / Folder Share)
 app.post('/api/fetch/link', async (req, res) => {
     try {
         const { url } = req.body;
@@ -97,6 +97,46 @@ app.post('/api/fetch/link', async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// 4b. Fetch Link with SSE Progress (untuk link share folder besar)
+app.get('/api/fetch/link/stream', async (req, res) => {
+    const url = req.query.url;
+    if (!url || !url.trim()) {
+        return res.status(400).send('URL is required');
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+
+    const sendEvent = (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+        sendEvent({ type: 'start', message: 'Memulai ekstraksi share link...' });
+
+        const files = await teraboxService.fetchLink(url.trim(), (progress) => {
+            sendEvent({ type: 'progress', ...progress });
+        });
+
+        sendEvent({ type: 'saving', message: `Menyimpan ${files.length} file ke database...`, filesFound: files.length });
+        const savedDocs = await dbService.insertBatchFiles(files);
+
+        sendEvent({
+            type: 'done',
+            success: true,
+            message: `Selesai! Berhasil menyimpan ${savedDocs.length} file ke database`,
+            count: savedDocs.length
+        });
+    } catch (err) {
+        sendEvent({ type: 'error', message: err.message });
+    } finally {
+        res.end();
     }
 });
 
@@ -300,7 +340,6 @@ app.get('/api/stream/:id', async (req, res) => {
                     tsUrlStore.delete(firstKey);
                 }
 
-                // Gunakan relative path /api/ts/... agar otomatis mengikuti HTTPS domain tanpa hardcode http://
                 return `/api/ts/${segKey}`;
             }
             return line;

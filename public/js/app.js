@@ -221,14 +221,12 @@ function renderPagination(current, total) {
 
     let html = '';
 
-    // Tombol Previous
     if (current > 1) {
         html += `<button class="page-btn" onclick="loadFiles(${current - 1})" title="Halaman Sebelumnya"><i class="fa-solid fa-chevron-left"></i></button>`;
     } else {
         html += `<button class="page-btn disabled" disabled><i class="fa-solid fa-chevron-left"></i></button>`;
     }
 
-    // Smart page range logic (Max 7 page items)
     const pages = [];
     if (total <= 7) {
         for (let i = 1; i <= total; i++) pages.push(i);
@@ -250,7 +248,6 @@ function renderPagination(current, total) {
         }
     });
 
-    // Tombol Next
     if (current < total) {
         html += `<button class="page-btn" onclick="loadFiles(${current + 1})" title="Halaman Selanjutnya"><i class="fa-solid fa-chevron-right"></i></button>`;
     } else {
@@ -391,45 +388,11 @@ async function deleteFileRecord(fileId) {
     }
 }
 
-// 6. Fetch Single Link Handler
-document.getElementById('form-fetch-link').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const input = document.getElementById('input-fetch-link');
-    const btn = document.getElementById('btn-submit-link');
-    const url = input.value.trim();
-
-    btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Fetching...`;
-
-    try {
-        const res = await fetch('/api/fetch/link', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            showToast(data.message, 'success');
-            input.value = '';
-            loadFiles(1);
-            loadStats();
-        } else {
-            showToast(data.error, 'error');
-        }
-    } catch (err) {
-        showToast('Terjadi kesalahan: ' + err.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-bolt"></i> Fetch & Save`;
-    }
-});
-
-// 7. Realtime Stream Progress Fetcher (Folder & Account)
+// 6. Realtime Stream Progress Fetcher
 function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
     progressContainer.style.display = 'block';
     progressBarFill.style.width = '15%';
-    progressStatusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Memulai pemindaian...`;
+    progressStatusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Memulai ekstraksi...`;
     progressCountText.innerText = '0 File Ditemukan';
     progressLogText.innerText = 'Menghubungkan ke server Terabox...';
 
@@ -443,12 +406,12 @@ function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
             const data = JSON.parse(event.data);
 
             if (data.type === 'start') {
-                progressStatusText.innerHTML = `<i class="fa-solid fa-folder-tree fa-spin"></i> Memindai folder...`;
+                progressStatusText.innerHTML = `<i class="fa-solid fa-folder-tree fa-spin"></i> Memindai isi...`;
                 progressLogText.innerText = data.message;
             } else if (data.type === 'progress') {
                 const count = data.filesFound || 0;
                 progressCountText.innerText = `${count} File Ditemukan`;
-                progressLogText.innerText = data.message || `Folder: ${data.currentDir}`;
+                progressLogText.innerText = data.message || `Path: ${data.currentDir}`;
                 const currentWidth = Math.min(85, 20 + count * 2);
                 progressBarFill.style.width = `${currentWidth}%`;
             } else if (data.type === 'saving') {
@@ -492,6 +455,18 @@ function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
         btnElement.innerHTML = originalBtnHtml;
     };
 }
+
+// Form Fetch Share Link (Support Single File & Folder Share)
+document.getElementById('form-fetch-link').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('input-fetch-link');
+    const btn = document.getElementById('btn-submit-link');
+    const url = input.value.trim();
+    const originalHtml = `<i class="fa-solid fa-bolt"></i> Fetch & Save`;
+
+    const streamUrl = `/api/fetch/link/stream?url=${encodeURIComponent(url)}`;
+    startSSEFetchStream(streamUrl, btn, originalHtml);
+});
 
 // Form Fetch Folder (Realtime Progress)
 document.getElementById('form-fetch-folder').addEventListener('submit', (e) => {
