@@ -59,6 +59,36 @@ function showToast(message, type = 'info') {
     }, 4000);
 }
 
+// Fallback Copy to Clipboard (Support HTTP/HTTPS di VPS/IP)
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        return new Promise((resolve, reject) => {
+            document.execCommand('copy') ? resolve() : reject(new Error('Gagal menyalin'));
+            textArea.remove();
+        });
+    }
+}
+
+// Quick Copy Stream URL from Card / Action
+function copyStreamUrlByFileId(fileId) {
+    const streamUrl = `${window.location.origin}/api/stream/${fileId}`;
+    copyTextToClipboard(streamUrl).then(() => {
+        showToast('Stream URL berhasil disalin: ' + streamUrl, 'success');
+    }).catch(err => {
+        prompt('Salin link stream berikut:', streamUrl);
+    });
+}
+
 // 1. Fetch Stats & System Status
 async function loadStats() {
     try {
@@ -146,6 +176,7 @@ function renderFiles(files) {
                     </div>
                     <div class="card-actions">
                         ${file.category === 'video' ? `<button class="btn btn-primary btn-sm" onclick="openPlayer('${file._id || file.fs_id}')"><i class="fa-solid fa-play"></i> Play</button>` : ''}
+                        ${file.category === 'video' ? `<button class="btn btn-secondary btn-sm" onclick="copyStreamUrlByFileId('${file._id || file.fs_id}')" title="Copy Stream Link"><i class="fa-solid fa-copy"></i></button>` : ''}
                         <button class="btn btn-secondary btn-sm" onclick="openEdit('${file._id || file.fs_id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="deleteFileRecord('${file._id || file.fs_id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -171,6 +202,7 @@ function renderFiles(files) {
                 <td>
                     <div style="display: flex; gap: 6px;">
                         ${file.category === 'video' ? `<button class="btn btn-primary btn-sm" onclick="openPlayer('${file._id || file.fs_id}')"><i class="fa-solid fa-play"></i></button>` : ''}
+                        ${file.category === 'video' ? `<button class="btn btn-secondary btn-sm" onclick="copyStreamUrlByFileId('${file._id || file.fs_id}')" title="Copy Stream Link"><i class="fa-solid fa-copy"></i></button>` : ''}
                         <button class="btn btn-secondary btn-sm" onclick="openEdit('${file._id || file.fs_id}')"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="deleteFileRecord('${file._id || file.fs_id}')"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -382,7 +414,6 @@ function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
                 const count = data.filesFound || 0;
                 progressCountText.innerText = `${count} File Ditemukan`;
                 progressLogText.innerText = data.message || `Folder: ${data.currentDir}`;
-                // Animasikan progress bar secara dinamis
                 const currentWidth = Math.min(85, 20 + count * 2);
                 progressBarFill.style.width = `${currentWidth}%`;
             } else if (data.type === 'saving') {
@@ -520,11 +551,15 @@ document.getElementById('btn-close-player').addEventListener('click', closePlaye
 document.getElementById('btn-close-edit').addEventListener('click', () => modalEdit.classList.remove('active'));
 document.getElementById('btn-cancel-edit').addEventListener('click', () => modalEdit.classList.remove('active'));
 
+// Copy Stream API Button in Player Modal
 document.getElementById('btn-copy-stream-url').addEventListener('click', () => {
     if (activeStreamFile) {
         const url = `${window.location.origin}/api/stream/${activeStreamFile._id || activeStreamFile.fs_id}`;
-        navigator.clipboard.writeText(url);
-        showToast('Stream URL berhasil disalin ke clipboard!', 'success');
+        copyTextToClipboard(url).then(() => {
+            showToast('Stream URL berhasil disalin!', 'success');
+        }).catch(() => {
+            prompt('Salin link stream berikut:', url);
+        });
     }
 });
 
