@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeraCloud - Terabox Admin Dashboard & Streaming Platform</title>
+    <title>TeraCloud - Terabox Video Streaming & Admin Platform</title>
     
     <!-- Google Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,11 +24,11 @@
     <aside class="sidebar">
         <div class="logo-area">
             <div class="logo-icon">
-                <i class="fa-solid fa-cloud-arrow-down"></i>
+                <i class="fa-solid fa-play"></i>
             </div>
             <div class="logo-text">
                 <h1>TeraCloud</h1>
-                <span>ADMIN PLATFORM</span>
+                <span>VIDEO STREAMING</span>
             </div>
         </div>
 
@@ -37,10 +37,10 @@
                 <a href="#" id="nav-dashboard"><i class="fa-solid fa-layer-group"></i> <span>Dashboard</span></a>
             </li>
             <li class="nav-item">
-                <a href="#" id="nav-fetch"><i class="fa-solid fa-bolt"></i> <span>Fetch Engine</span></a>
+                <a href="#" id="nav-fetch"><i class="fa-solid fa-bolt"></i> <span>Fetch Video Engine</span></a>
             </li>
             <li class="nav-item">
-                <a href="#" id="nav-files"><i class="fa-solid fa-folder-open"></i> <span>Database Files</span></a>
+                <a href="#" id="nav-files"><i class="fa-solid fa-film"></i> <span>Video Collection</span></a>
             </li>
             <li class="nav-item">
                 <a href="/api-docs" target="_blank" id="nav-api-docs"><i class="fa-solid fa-book"></i> <span>Swagger API Docs</span></a>
@@ -66,8 +66,8 @@
         <!-- Top Header -->
         <header class="top-header">
             <div class="header-title">
-                <h2>Admin Dashboard</h2>
-                <p>Kelola video, streaming HLS, dan sinkronisasi metadata Terabox ke MongoDB</p>
+                <h2>Video Cloud Admin</h2>
+                <p>Platform streaming video HLS otomatis & indexer Terabox ke MongoDB</p>
             </div>
             <div class="header-actions">
                 <a href="/api-docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">
@@ -85,21 +85,21 @@
         <!-- Stats Grid -->
         <section class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon blue">
-                    <i class="fa-solid fa-file-video"></i>
-                </div>
-                <div class="stat-info">
-                    <h3 id="stat-total-files">0</h3>
-                    <p>Total Database Records</p>
-                </div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-icon purple">
-                    <i class="fa-solid fa-play"></i>
+                    <i class="fa-solid fa-video"></i>
                 </div>
                 <div class="stat-info">
                     <h3 id="stat-total-videos">0</h3>
-                    <p>Ready to Stream</p>
+                    <p>Total Video Ready</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fa-solid fa-play"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="stat-total-files">0</h3>
+                    <p>Stream Endpoints Active</p>
                 </div>
             </div>
             <div class="stat-card">
@@ -108,7 +108,7 @@
                 </div>
                 <div class="stat-info">
                     <h3 id="stat-total-size">0 B</h3>
-                    <p>Total Indexed Size</p>
+                    <p>Total Video Size</p>
                 </div>
             </div>
             <div class="stat-card">
@@ -116,7 +116,7 @@
                     <i class="fa-solid fa-database"></i>
                 </div>
                 <div class="stat-info">
-                    <h3 id="stat-db-type">MongoDB / Embedded</h3>
+                    <h3 id="stat-db-type">MongoDB</h3>
                     <p>Storage Engine</p>
                 </div>
             </div>
@@ -126,13 +126,13 @@
         <section class="fetch-panel" id="fetch-section">
             <div class="fetch-tabs">
                 <button class="tab-btn active" data-tab="tab-link">
-                    <i class="fa-solid fa-link"></i> Fetch Share Link
+                    <i class="fa-solid fa-link"></i> Fetch Share Link (Video)
                 </button>
                 <button class="tab-btn" data-tab="tab-folder">
-                    <i class="fa-solid fa-folder-tree"></i> Fetch Account Folder
+                    <i class="fa-solid fa-folder-tree"></i> Fetch Account Folder (Video Only)
                 </button>
                 <button class="tab-btn" data-tab="tab-all-account">
-                    <i class="fa-solid fa-arrows-spin"></i> Fetch All Account Files
+                    <i class="fa-solid fa-arrows-spin"></i> Fetch All Account Videos
                 </button>
             </div>
 
@@ -142,7 +142,7 @@
                     <div class="input-group">
                         <input type="url" class="form-control" id="input-fetch-link" placeholder="Tempelkan link Terabox (misal: https://1024terabox.com/s/1xxxxxxx)..." required>
                         <button type="submit" class="btn btn-primary" id="btn-submit-link">
-                            <i class="fa-solid fa-bolt"></i> Fetch & Save
+                            <i class="fa-solid fa-bolt"></i> Fetch Videos
                         </button>
                     </div>
                 </form>
@@ -154,7 +154,7 @@
                     <div class="input-group">
                         <input type="text" class="form-control" id="input-fetch-folder" placeholder="Masukkan Path Folder Akun (contoh: /syumildee atau /)..." value="/" required>
                         <button type="submit" class="btn btn-primary" id="btn-submit-folder">
-                            <i class="fa-solid fa-folder-open"></i> Scan & Sync Folder
+                            <i class="fa-solid fa-folder-open"></i> Scan & Sync Videos
                         </button>
                     </div>
                 </form>
@@ -164,10 +164,10 @@
             <div class="tab-content" id="tab-all-account">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <p style="color: var(--text-muted); font-size: 14px;">
-                        Pindai seluruh folder dan file di dalam akun Terabox Anda secara rekursif dan simpan metadatanya ke database.
+                        Pindai seluruh folder di akun Terabox Anda dan <strong>hanya simpan file video</strong> ke database MongoDB secara otomatis.
                     </p>
                     <button type="button" class="btn btn-primary" id="btn-fetch-all-account">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Start Full Account Sync
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Start Full Video Sync
                     </button>
                 </div>
             </div>
@@ -176,9 +176,9 @@
             <div id="fetch-progress-container" style="display: none; margin-top: 20px; padding: 16px; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span id="progress-status-text" style="font-size: 13px; font-weight: 600; color: #fff;">
-                        <i class="fa-solid fa-spinner fa-spin"></i> Memulai pemindaian...
+                        <i class="fa-solid fa-spinner fa-spin"></i> Memulai ekstraksi video...
                     </span>
-                    <span id="progress-count-text" style="font-size: 13px; color: var(--primary); font-weight: 700;">0 File Ditemukan</span>
+                    <span id="progress-count-text" style="font-size: 13px; color: var(--primary); font-weight: 700;">0 Video Ditemukan</span>
                 </div>
                 <div style="width: 100%; height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 4px; overflow: hidden; position: relative;">
                     <div id="progress-bar-fill" style="width: 0%; height: 100%; background: var(--accent-gradient); border-radius: 4px; transition: width 0.3s ease;"></div>
@@ -193,24 +193,16 @@
         <section class="controls-bar">
             <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" class="form-control" id="input-search" placeholder="Cari judul file atau folder...">
+                <input type="text" class="form-control" id="input-search" placeholder="Cari judul video atau folder...">
             </div>
 
             <div class="filters-group">
-                <select class="select-filter" id="select-category">
-                    <option value="all">Semua Kategori</option>
-                    <option value="video">Hanya Video</option>
-                    <option value="image">Gambar / Foto</option>
-                    <option value="document">Dokumen</option>
-                    <option value="other">Lainnya</option>
-                </select>
-
                 <select class="select-filter" id="select-sort">
                     <option value="newest">Terbaru</option>
                     <option value="oldest">Terlama</option>
                     <option value="size_desc">Ukuran (Terbesar)</option>
                     <option value="size_asc">Ukuran (Terkecil)</option>
-                    <option value="title_asc">Nama (A-Z)</option>
+                    <option value="title_asc">Judul (A-Z)</option>
                 </select>
 
                 <div class="view-toggle">
@@ -230,8 +222,7 @@
                 <thead>
                     <tr>
                         <th>Thumbnail</th>
-                        <th>Judul File</th>
-                        <th>Kategori</th>
+                        <th>Judul Video</th>
                         <th>Ukuran</th>
                         <th>Folder / Path</th>
                         <th>Tanggal Tambah</th>
@@ -276,25 +267,15 @@
 <div class="modal" id="modal-edit">
     <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
-            <h3>Edit Metadata File</h3>
+            <h3>Edit Judul Video</h3>
             <button class="modal-close" id="btn-close-edit"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
             <form id="form-edit-file">
                 <input type="hidden" id="edit-file-id">
-                <div style="margin-bottom: 14px;">
-                    <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-muted);">Judul File</label>
-                    <input type="text" class="form-control" id="edit-file-title" required>
-                </div>
                 <div style="margin-bottom: 18px;">
-                    <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-muted);">Kategori</label>
-                    <select class="form-control" id="edit-file-category">
-                        <option value="video">Video</option>
-                        <option value="image">Image</option>
-                        <option value="document">Document</option>
-                        <option value="audio">Audio</option>
-                        <option value="other">Other</option>
-                    </select>
+                    <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-muted);">Judul Video</label>
+                    <input type="text" class="form-control" id="edit-file-title" required>
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-edit">Batal</button>

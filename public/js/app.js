@@ -1,4 +1,4 @@
-// TeraCloud Dashboard Controller
+// TeraCloud Video Dashboard Controller
 let currentPage = 1;
 let currentLimit = 24;
 let currentView = 'grid';
@@ -19,7 +19,6 @@ const filesTableBody = document.getElementById('files-table-body');
 const paginationContainer = document.getElementById('pagination-container');
 
 const inputSearch = document.getElementById('input-search');
-const selectCategory = document.getElementById('select-category');
 const selectSort = document.getElementById('select-sort');
 const btnViewGrid = document.getElementById('btn-view-grid');
 const btnViewTable = document.getElementById('btn-view-table');
@@ -115,15 +114,14 @@ async function loadStats() {
     }
 }
 
-// 2. Fetch File List from Database (CRUD Read)
+// 2. Fetch Video List from Database (CRUD Read)
 async function loadFiles(page = 1) {
     currentPage = page;
     const search = inputSearch.value.trim();
-    const category = selectCategory.value;
     const sort = selectSort.value;
 
     try {
-        const url = `/api/files?page=${page}&limit=${currentLimit}&search=${encodeURIComponent(search)}&category=${category}&sort=${sort}`;
+        const url = `/api/files?page=${page}&limit=${currentLimit}&search=${encodeURIComponent(search)}&category=video&sort=${sort}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -132,22 +130,22 @@ async function loadFiles(page = 1) {
             renderPagination(data.page, data.totalPages);
         }
     } catch (e) {
-        showToast('Gagal memuat data file: ' + e.message, 'error');
+        showToast('Gagal memuat data video: ' + e.message, 'error');
     }
 }
 
-// Render Files to Grid & Table
+// Render Videos to Grid & Table
 function renderFiles(files) {
     if (!files || files.length === 0) {
         const emptyHtml = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted);">
-                <i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; margin-bottom: 16px; color: var(--text-dim);"></i>
-                <h3 style="font-size: 16px; color: #fff;">Belum Ada File di Database</h3>
-                <p style="font-size: 13px; margin-top: 6px;">Gunakan panel Fetch Engine di atas untuk mengambil link atau memindai folder Terabox Anda.</p>
+                <i class="fa-solid fa-film" style="font-size: 48px; margin-bottom: 16px; color: var(--text-dim);"></i>
+                <h3 style="font-size: 16px; color: #fff;">Belum Ada Video di Database</h3>
+                <p style="font-size: 13px; margin-top: 6px;">Gunakan panel Fetch Video Engine di atas untuk mengambil link share atau memindai folder Terabox Anda.</p>
             </div>
         `;
         filesGridContainer.innerHTML = emptyHtml;
-        filesTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">Belum ada file di database</td></tr>`;
+        filesTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">Belum ada video di database</td></tr>`;
         return;
     }
 
@@ -155,18 +153,14 @@ function renderFiles(files) {
     filesGridContainer.innerHTML = files.map(file => {
         const thumbHtml = file.thumbnail 
             ? `<img src="${file.thumbnail}" alt="${escapeHtml(file.title)}" loading="lazy" onerror="this.src='/thumb_fallback.png'">`
-            : `<div class="thumb-placeholder"><i class="fa-solid ${getCategoryIcon(file.category)}"></i></div>`;
-
-        const playBtnHtml = file.category === 'video'
-            ? `<button class="play-overlay-btn" onclick="openPlayer('${file._id || file.fs_id}')" title="Play Video"><i class="fa-solid fa-play"></i></button>`
-            : '';
+            : `<div class="thumb-placeholder"><i class="fa-solid fa-file-video"></i></div>`;
 
         return `
             <div class="file-card">
                 <div class="card-thumb-wrap">
                     ${thumbHtml}
-                    <span class="card-badge ${file.category}">${file.category}</span>
-                    ${playBtnHtml}
+                    <span class="card-badge video">VIDEO</span>
+                    <button class="play-overlay-btn" onclick="openPlayer('${file._id || file.fs_id}')" title="Play Video"><i class="fa-solid fa-play"></i></button>
                 </div>
                 <div class="card-body">
                     <h4 class="card-title" title="${escapeHtml(file.title)}">${escapeHtml(file.title)}</h4>
@@ -175,8 +169,8 @@ function renderFiles(files) {
                         <span><i class="fa-solid fa-folder"></i> ${escapeHtml(file.path || '/')}</span>
                     </div>
                     <div class="card-actions">
-                        ${file.category === 'video' ? `<button class="btn btn-primary btn-sm" onclick="openPlayer('${file._id || file.fs_id}')"><i class="fa-solid fa-play"></i> Play</button>` : ''}
-                        ${file.category === 'video' ? `<button class="btn btn-secondary btn-sm" onclick="copyStreamUrlByFileId('${file._id || file.fs_id}')" title="Copy Stream Link"><i class="fa-solid fa-copy"></i></button>` : ''}
+                        <button class="btn btn-primary btn-sm" onclick="openPlayer('${file._id || file.fs_id}')"><i class="fa-solid fa-play"></i> Play</button>
+                        <button class="btn btn-secondary btn-sm" onclick="copyStreamUrlByFileId('${file._id || file.fs_id}')" title="Copy Stream Link"><i class="fa-solid fa-copy"></i></button>
                         <button class="btn btn-secondary btn-sm" onclick="openEdit('${file._id || file.fs_id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="deleteFileRecord('${file._id || file.fs_id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -189,20 +183,19 @@ function renderFiles(files) {
     filesTableBody.innerHTML = files.map(file => {
         const thumbSmall = file.thumbnail
             ? `<img src="${file.thumbnail}" style="width: 48px; height: 32px; object-fit: cover; border-radius: 4px;">`
-            : `<i class="fa-solid ${getCategoryIcon(file.category)}" style="font-size: 20px; color: var(--text-dim);"></i>`;
+            : `<i class="fa-solid fa-file-video" style="font-size: 20px; color: var(--text-dim);"></i>`;
 
         return `
             <tr>
                 <td>${thumbSmall}</td>
                 <td><strong>${escapeHtml(file.title)}</strong></td>
-                <td><span class="card-badge ${file.category}" style="position: static;">${file.category}</span></td>
                 <td>${file.size_formatted || formatSize(file.size)}</td>
                 <td><code>${escapeHtml(file.path || '/')}</code></td>
                 <td>${new Date(file.created_at).toLocaleDateString()}</td>
                 <td>
                     <div style="display: flex; gap: 6px;">
-                        ${file.category === 'video' ? `<button class="btn btn-primary btn-sm" onclick="openPlayer('${file._id || file.fs_id}')"><i class="fa-solid fa-play"></i></button>` : ''}
-                        ${file.category === 'video' ? `<button class="btn btn-secondary btn-sm" onclick="copyStreamUrlByFileId('${file._id || file.fs_id}')" title="Copy Stream Link"><i class="fa-solid fa-copy"></i></button>` : ''}
+                        <button class="btn btn-primary btn-sm" onclick="openPlayer('${file._id || file.fs_id}')"><i class="fa-solid fa-play"></i></button>
+                        <button class="btn btn-secondary btn-sm" onclick="copyStreamUrlByFileId('${file._id || file.fs_id}')" title="Copy Stream Link"><i class="fa-solid fa-copy"></i></button>
                         <button class="btn btn-secondary btn-sm" onclick="openEdit('${file._id || file.fs_id}')"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="deleteFileRecord('${file._id || file.fs_id}')"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -336,7 +329,6 @@ async function openEdit(fileId) {
         const file = data.file;
         document.getElementById('edit-file-id').value = file._id || file.fs_id;
         document.getElementById('edit-file-title').value = file.title;
-        document.getElementById('edit-file-category').value = file.category;
 
         modalEdit.classList.add('active');
     } catch (e) {
@@ -348,17 +340,16 @@ document.getElementById('form-edit-file').addEventListener('submit', async (e) =
     e.preventDefault();
     const fileId = document.getElementById('edit-file-id').value;
     const title = document.getElementById('edit-file-title').value;
-    const category = document.getElementById('edit-file-category').value;
 
     try {
         const res = await fetch(`/api/files/${fileId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, category })
+            body: JSON.stringify({ title, category: 'video' })
         });
         const data = await res.json();
         if (data.success) {
-            showToast('Metadata berhasil diperbarui!', 'success');
+            showToast('Judul video berhasil diperbarui!', 'success');
             modalEdit.classList.remove('active');
             loadFiles(currentPage);
         } else {
@@ -371,13 +362,13 @@ document.getElementById('form-edit-file').addEventListener('submit', async (e) =
 
 // 5. CRUD Delete File
 async function deleteFileRecord(fileId) {
-    if (!confirm('Apakah Anda yakin ingin menghapus metadata file ini dari database?')) return;
+    if (!confirm('Apakah Anda yakin ingin menghapus video ini dari database?')) return;
 
     try {
         const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.success) {
-            showToast('File berhasil dihapus dari database', 'success');
+            showToast('Video berhasil dihapus dari database', 'success');
             loadFiles(currentPage);
             loadStats();
         } else {
@@ -393,7 +384,7 @@ function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
     progressContainer.style.display = 'block';
     progressBarFill.style.width = '15%';
     progressStatusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Memulai ekstraksi...`;
-    progressCountText.innerText = '0 File Ditemukan';
+    progressCountText.innerText = '0 Video Ditemukan';
     progressLogText.innerText = 'Menghubungkan ke server Terabox...';
 
     btnElement.disabled = true;
@@ -406,11 +397,11 @@ function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
             const data = JSON.parse(event.data);
 
             if (data.type === 'start') {
-                progressStatusText.innerHTML = `<i class="fa-solid fa-folder-tree fa-spin"></i> Memindai isi...`;
+                progressStatusText.innerHTML = `<i class="fa-solid fa-video fa-spin"></i> Memindai video...`;
                 progressLogText.innerText = data.message;
             } else if (data.type === 'progress') {
                 const count = data.filesFound || 0;
-                progressCountText.innerText = `${count} File Ditemukan`;
+                progressCountText.innerText = `${count} Video Ditemukan`;
                 progressLogText.innerText = data.message || `Path: ${data.currentDir}`;
                 const currentWidth = Math.min(85, 20 + count * 2);
                 progressBarFill.style.width = `${currentWidth}%`;
@@ -421,7 +412,7 @@ function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
             } else if (data.type === 'done') {
                 progressBarFill.style.width = '100%';
                 progressStatusText.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--success);"></i> Selesai!`;
-                progressCountText.innerText = `${data.count} File Tersimpan`;
+                progressCountText.innerText = `${data.count} Video Tersimpan`;
                 progressLogText.innerText = data.message;
 
                 showToast(data.message, 'success');
@@ -456,35 +447,35 @@ function startSSEFetchStream(streamUrl, btnElement, originalBtnHtml) {
     };
 }
 
-// Form Fetch Share Link (Support Single File & Folder Share)
+// Form Fetch Share Link (Hanya Video)
 document.getElementById('form-fetch-link').addEventListener('submit', (e) => {
     e.preventDefault();
     const input = document.getElementById('input-fetch-link');
     const btn = document.getElementById('btn-submit-link');
     const url = input.value.trim();
-    const originalHtml = `<i class="fa-solid fa-bolt"></i> Fetch & Save`;
+    const originalHtml = `<i class="fa-solid fa-bolt"></i> Fetch Videos`;
 
     const streamUrl = `/api/fetch/link/stream?url=${encodeURIComponent(url)}`;
     startSSEFetchStream(streamUrl, btn, originalHtml);
 });
 
-// Form Fetch Folder (Realtime Progress)
+// Form Fetch Folder (Hanya Video)
 document.getElementById('form-fetch-folder').addEventListener('submit', (e) => {
     e.preventDefault();
     const input = document.getElementById('input-fetch-folder');
     const btn = document.getElementById('btn-submit-folder');
     const folderPath = input.value.trim();
-    const originalHtml = `<i class="fa-solid fa-folder-open"></i> Scan & Sync Folder`;
+    const originalHtml = `<i class="fa-solid fa-folder-open"></i> Scan & Sync Videos`;
 
     const streamUrl = `/api/fetch/folder/stream?folderPath=${encodeURIComponent(folderPath)}&recursive=true`;
     startSSEFetchStream(streamUrl, btn, originalHtml);
 });
 
-// Button Fetch All Account (Realtime Progress)
+// Button Fetch All Account (Hanya Video)
 document.getElementById('btn-fetch-all-account').addEventListener('click', () => {
-    if (!confirm('Pindai seluruh file dari semua folder di akun Terabox Anda?')) return;
+    if (!confirm('Pindai seluruh video dari semua folder di akun Terabox Anda?')) return;
     const btn = document.getElementById('btn-fetch-all-account');
-    const originalHtml = `<i class="fa-solid fa-wand-magic-sparkles"></i> Start Full Account Sync`;
+    const originalHtml = `<i class="fa-solid fa-wand-magic-sparkles"></i> Start Full Video Sync`;
 
     const streamUrl = `/api/fetch/account/stream`;
     startSSEFetchStream(streamUrl, btn, originalHtml);
@@ -534,16 +525,6 @@ function formatSize(bytes) {
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function getCategoryIcon(cat) {
-    switch (cat) {
-        case 'video': return 'fa-file-video';
-        case 'image': return 'fa-file-image';
-        case 'audio': return 'fa-file-audio';
-        case 'document': return 'fa-file-lines';
-        default: return 'fa-file';
-    }
 }
 
 function escapeHtml(str) {
@@ -600,12 +581,11 @@ btnViewTable.addEventListener('click', () => {
 
 // Filters and Search
 inputSearch.addEventListener('input', () => loadFiles(1));
-selectCategory.addEventListener('change', () => loadFiles(1));
 selectSort.addEventListener('change', () => loadFiles(1));
 document.getElementById('btn-refresh-stats').addEventListener('click', () => {
     loadStats();
     loadFiles(currentPage);
-    showToast('Data berhasil disegarkan', 'info');
+    showToast('Data video berhasil disegarkan', 'info');
 });
 
 // Initialize on load

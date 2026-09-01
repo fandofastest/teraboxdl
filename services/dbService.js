@@ -1,24 +1,25 @@
-const fs = require('fs');
-const path = require('path');
 const mongoose = require('mongoose');
 const Datastore = require('nedb-promises');
+const path = require('path');
 
-let isMongoConnected = false;
+let isMongoDB = false;
 let FileModel = null;
-let localDb = null;
+let localDB = null;
 
-// Skema Mongoose jika terhubung ke MongoDB
+// Schema MongoDB
 const fileSchema = new mongoose.Schema({
-    fs_id: { type: String, required: true, unique: true },
-    title: { type: String, required: true },
-    category: { type: String, default: 'other' },
+    fs_id: { type: String, required: true, unique: true, index: true },
+    title: { type: String, required: true, index: true },
+    category: { type: String, default: 'video', index: true },
     size: { type: Number, default: 0 },
     size_formatted: { type: String, default: '0 B' },
     thumbnail: { type: String, default: '' },
     stream_url: { type: String, default: '' },
+    share_url: { type: String, default: '' },
+    surl: { type: String, default: '' },
     dlink: { type: String, default: '' },
-    path: { type: String, default: '/' },
-    source_type: { type: String, default: 'link' }, // 'link' | 'folder' | 'account'
+    path: { type: String, default: '/', index: true },
+    source_type: { type: String, default: 'link' },
     shareid: { type: String, default: '' },
     uk: { type: String, default: '' },
     sign: { type: String, default: '' },
@@ -28,139 +29,215 @@ const fileSchema = new mongoose.Schema({
     updated_at: { type: Date, default: Date.now }
 });
 
+fileSchema.pre('save', function(next) {
+    this.updated_at = Date.now();
+    next();
+});
+
 async function initDB() {
     const mongoUri = process.env.MONGODB_URI;
-
-    if (mongoUri && mongoUri.trim().length > 0) {
+    if (mongoUri) {
         try {
-            console.log('[*] Menghubungkan ke MongoDB...', mongoUri);
-            await mongoose.connect(mongoUri.trim(), { serverSelectionTimeoutMS: 5000 });
-            isMongoConnected = true;
-            FileModel = mongoose.model('File', fileSchema);
-            console.log('[✓] Berhasil terhubung ke MongoDB database!');
+            console.log(`[*] Menghubungkan ke MongoDB... ${mongoUri.replace(/:([^:@]+)@/, ':****@')}`);
+            await mongoose.connect(mongoUri, {
+                serverSelectionTimeoutMS: 5000
+            });
+            isMongoDB = true;
+            FileModel = mongoose.models.File || mongoose.model('File', fileSchema);
+            console.log(`[✓] Berhasil terhubung ke MongoDB database!`);
             return;
         } catch (err) {
-            console.warn('[!] Gagal terhubung ke MongoDB, beralih ke Local Embedded Database...');
+            console.warn(`[!] Gagal terhubung ke MongoDB: ${err.message}. Menggunakan database lokal (NeDB fallback)...`);
         }
+    } else {
+        console.log(`[*] Tidak ada MONGODB_URI di .env. Menggunakan database lokal NeDB.`);
     }
 
-    // Fallback: Local Embedded DB
-    const dataDir = path.join(__dirname, '..', 'data');
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-    }
-    const dbPath = path.join(dataDir, 'database.db');
-    localDb = Datastore.create({ filename: dbPath, autoload: true });
-    console.log(`[✓] Berhasil menginisialisasi Local Embedded Database: ${dbPath}`);
+    // Fallback ke Embedded Local Database
+    const dbPath = path.join(__dirname, '..', 'data', 'terabox_files.db');
+    localDB = Datastore.create({
+        filename: dbPath,
+        autoload: true
+    });
+    console.log(`[✓] Database lokal NeDB aktif di: ${dbPath}`);
 }
 
+/**
+ * Insert or Update single file (Upsert) - Hanya Video
+ */
 async function insertOrUpdateFile(fileData) {
+    fileData.category = 'video';
     fileData.updated_at = new Date();
-    if (!fileData.created_at) fileData.created_at = new Date();
 
-    if (isMongoConnected && FileModel) {
-        return await FileModel.findOneAndUpdate(
+    if (isMongoDB && FileModel) {
+        const result = await FileModel.findOneAndUpdate(
             { fs_id: fileData.fs_id },
             { $set: fileData },
             { upsert: true, new: true }
         );
-    } else {
-        const existing = await localDb.findOne({ fs_id: fileData.fs_id });
+        return result;
+    } else if (localDB) {
+        const existing = await localDB.findOne({ fs_id: fileData.fs_id });
         if (existing) {
-            await localDb.update({ fs_id: fileData.fs_id }, { $set: fileData });
-            return await localDb.findOne({ fs_id: fileData.fs_id });
+            await localDB.update({ fs_id: fileData.fs_id }, { $set: fileData });
+            return await localDB.findOne({ fs_id: fileData.fs_id });
         } else {
-            return await localDb.insert(fileData);
+            fileData.created_at = new Date();
+            return await localDB.insert(fileData);
         }
     }
 }
 
+/**
+ * Insert or Update multiple files (Bulk Upsert) - Hanya Video
+ */
 async function insertBatchFiles(filesList) {
-    const results = [];
+    if (!filesList || filesList.length === 0) return [];
+
+    const savedFiles = [];
     for (const f of filesList) {
-        const doc = await insertOrUpdateFile(f);
-        results.push(doc);
+        try {
+            const saved = await insertOrUpdateFile(f);
+            savedFiles.push(saved);
+        } catch (e) {
+            console.error(`Error saving file ${f.title}:`, e.message);
+        }
     }
-    return results;
+    return savedFiles;
 }
 
-async function getFiles({ search = '', category = '', page = 1, limit = 24, sort = 'newest' }) {
-    const query = {};
-    if (search) {
-        query.title = isMongoConnected 
-            ? { $regex: search, $options: 'i' } 
-            : new RegExp(search, 'i');
-    }
-    if (category && category !== 'all') {
-        query.category = category;
+/**
+ * Query Files (Pencarian & Pagination) - Default Selalu Video
+ */
+async function getFiles({ search = '', category = 'video', page = 1, limit = 24, sort = 'newest' }) {
+    const query = { category: 'video' };
+
+    if (search && search.trim() !== '') {
+        const regex = new RegExp(search.trim(), 'i');
+        query.$or = [{ title: regex }, { path: regex }];
     }
 
-    let sortObj = { created_at: -1 };
-    if (sort === 'oldest') sortObj = { created_at: 1 };
-    if (sort === 'size_desc') sortObj = { size: -1 };
-    if (sort === 'size_asc') sortObj = { size: 1 };
-    if (sort === 'title_asc') sortObj = { title: 1 };
+    let sortOption = { created_at: -1 };
+    if (sort === 'oldest') sortOption = { created_at: 1 };
+    if (sort === 'size_desc') sortOption = { size: -1 };
+    if (sort === 'size_asc') sortOption = { size: 1 };
+    if (sort === 'title_asc') sortOption = { title: 1 };
 
     const skip = (page - 1) * limit;
 
-    if (isMongoConnected && FileModel) {
+    if (isMongoDB && FileModel) {
         const total = await FileModel.countDocuments(query);
-        const files = await FileModel.find(query).sort(sortObj).skip(skip).limit(limit);
-        return { total, page, limit, totalPages: Math.ceil(total / limit), files };
-    } else {
-        const total = await localDb.count(query);
-        const files = await localDb.find(query).sort(sortObj).skip(skip).limit(limit);
-        return { total, page, limit, totalPages: Math.ceil(total / limit), files };
+        const files = await FileModel.find(query)
+            .sort(sortOption)
+            .skip(skip)
+            .limit(limit)
+            .lean();
+
+        return {
+            files,
+            total,
+            page: Number(page),
+            totalPages: Math.ceil(total / limit)
+        };
+    } else if (localDB) {
+        const total = await localDB.count(query);
+        let cursor = localDB.find(query);
+        cursor = cursor.sort(sortOption).skip(skip).limit(limit);
+        const files = await cursor;
+
+        return {
+            files,
+            total,
+            page: Number(page),
+            totalPages: Math.ceil(total / limit)
+        };
     }
+    return { files: [], total: 0, page: 1, totalPages: 0 };
 }
 
+/**
+ * Get File By ID (MongoDB _id atau NeDB _id atau fs_id)
+ */
 async function getFileById(id) {
-    if (isMongoConnected && FileModel) {
+    if (isMongoDB && FileModel) {
         if (mongoose.Types.ObjectId.isValid(id)) {
-            return await FileModel.findById(id);
+            const byId = await FileModel.findById(id).lean();
+            if (byId) return byId;
         }
-        return await FileModel.findOne({ fs_id: id });
-    } else {
-        return await localDb.findOne({ $or: [{ _id: id }, { fs_id: id }] });
+        return await FileModel.findOne({ fs_id: id }).lean();
+    } else if (localDB) {
+        let file = await localDB.findOne({ _id: id });
+        if (!file) file = await localDB.findOne({ fs_id: id });
+        return file;
     }
+    return null;
 }
 
+/**
+ * Update File Metadata
+ */
 async function updateFile(id, updateData) {
     updateData.updated_at = new Date();
-    if (isMongoConnected && FileModel) {
-        const query = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { fs_id: id };
-        return await FileModel.findOneAndUpdate(query, { $set: updateData }, { new: true });
-    } else {
-        await localDb.update({ $or: [{ _id: id }, { fs_id: id }] }, { $set: updateData });
-        return await localDb.findOne({ $or: [{ _id: id }, { fs_id: id }] });
+    if (isMongoDB && FileModel) {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            return await FileModel.findByIdAndUpdate(id, { $set: updateData }, { new: true }).lean();
+        }
+        return await FileModel.findOneAndUpdate({ fs_id: id }, { $set: updateData }, { new: true }).lean();
+    } else if (localDB) {
+        await localDB.update({ _id: id }, { $set: updateData });
+        return await localDB.findOne({ _id: id });
     }
+    return null;
 }
 
+/**
+ * Delete File Record
+ */
 async function deleteFile(id) {
-    if (isMongoConnected && FileModel) {
-        const query = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { fs_id: id };
-        const res = await FileModel.deleteOne(query);
-        return res.deletedCount > 0;
-    } else {
-        const count = await localDb.remove({ $or: [{ _id: id }, { fs_id: id }] }, {});
-        return count > 0;
+    if (isMongoDB && FileModel) {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            return await FileModel.findByIdAndDelete(id);
+        }
+        return await FileModel.findOneAndDelete({ fs_id: id });
+    } else if (localDB) {
+        return await localDB.remove({ _id: id });
     }
+    return false;
 }
 
+/**
+ * Get Database Statistics
+ */
 async function getStats() {
-    if (isMongoConnected && FileModel) {
-        const totalFiles = await FileModel.countDocuments();
-        const totalVideos = await FileModel.countDocuments({ category: 'video' });
-        const sizeAgg = await FileModel.aggregate([{ $group: { _id: null, totalSize: { $sum: '$size' } } }]);
-        const totalSize = sizeAgg.length > 0 ? sizeAgg[0].totalSize : 0;
-        return { totalFiles, totalVideos, totalSize, isMongoDB: true };
-    } else {
-        const totalFiles = await localDb.count({});
-        const totalVideos = await localDb.count({ category: 'video' });
-        const allDocs = await localDb.find({});
-        const totalSize = allDocs.reduce((acc, cur) => acc + (cur.size || 0), 0);
-        return { totalFiles, totalVideos, totalSize, isMongoDB: false };
+    if (isMongoDB && FileModel) {
+        const totalFiles = await FileModel.countDocuments({ category: 'video' });
+        const totalVideos = totalFiles;
+        const sizeResult = await FileModel.aggregate([
+            { $match: { category: 'video' } },
+            { $group: { _id: null, totalSize: { $sum: '$size' } } }
+        ]);
+        const totalSize = sizeResult.length > 0 ? sizeResult[0].totalSize : 0;
+
+        return {
+            totalFiles,
+            totalVideos,
+            totalSize,
+            isMongoDB: true
+        };
+    } else if (localDB) {
+        const totalFiles = await localDB.count({ category: 'video' });
+        const allDocs = await localDB.find({ category: 'video' });
+        const totalSize = allDocs.reduce((acc, curr) => acc + (curr.size || 0), 0);
+
+        return {
+            totalFiles,
+            totalVideos: totalFiles,
+            totalSize,
+            isMongoDB: false
+        };
     }
+
+    return { totalFiles: 0, totalVideos: 0, totalSize: 0, isMongoDB: false };
 }
 
 module.exports = {

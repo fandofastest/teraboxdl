@@ -60,20 +60,13 @@ function extractSurl(urlStr) {
     return null;
 }
 
-function determineCategory(filename, categoryId) {
+function isVideoFile(filename, categoryId) {
     const ext = path.extname(filename).toLowerCase().replace('.', '');
-    const videoExts = ['mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'webm', 'ts', 'm4v', '3gp'];
-    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-    const audioExts = ['mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a'];
-    const docExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'];
-    const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'iso'];
-
-    if (categoryId === '1' || categoryId === 1 || videoExts.includes(ext)) return 'video';
-    if (categoryId === '3' || categoryId === 3 || imageExts.includes(ext)) return 'image';
-    if (categoryId === '2' || categoryId === 2 || audioExts.includes(ext)) return 'audio';
-    if (categoryId === '4' || categoryId === 4 || docExts.includes(ext)) return 'document';
-    if (categoryId === '5' || categoryId === 5 || archiveExts.includes(ext)) return 'archive';
-    return 'other';
+    const videoExts = ['mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'webm', 'ts', 'm4v', '3gp', 'rmvb', 'asf', 'vob', 'ogv'];
+    if (categoryId === '1' || categoryId === 1 || videoExts.includes(ext)) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -138,7 +131,7 @@ async function getFreshStreamUrl(fileDoc) {
 }
 
 /**
- * 1. Fetch File Dari Link Share (Support Single File & Folder Share Rekursif)
+ * 1. Fetch File Dari Link Share (Hanya Simpan & Ekstrak Video)
  */
 async function fetchLink(link, onProgress = null) {
     const cookie = parseCookieFile();
@@ -161,7 +154,6 @@ async function fetchLink(link, onProgress = null) {
         throw new Error("Format link Terabox tidak valid atau surl tidak ditemukan.");
     }
 
-    // 1. Ambil info root dari share link
     const apiUrl = `https://www.terabox.app/api/shorturlinfo?shorturl=${surl}&root=1`;
     const res = await fetch(apiUrl, { headers });
     const data = await res.json();
@@ -177,7 +169,6 @@ async function fetchLink(link, onProgress = null) {
 
     const allFiles = [];
 
-    // Fungsi rekursif untuk scan subfolder di dalam link share
     async function scanShareList(dirPath = '', rootFlag = 1) {
         let page = 1;
         let hasMore = true;
@@ -187,7 +178,7 @@ async function fetchLink(link, onProgress = null) {
                 status: 'scanning',
                 currentDir: dirPath || '/',
                 filesFound: allFiles.length,
-                message: `Memindai isi share: ${dirPath || 'Root folder'} (Ditemukan: ${allFiles.length} file)...`
+                message: `Memindai video di share: ${dirPath || 'Root'} (Ditemukan: ${allFiles.length} video)...`
             });
         }
 
@@ -206,34 +197,32 @@ async function fetchLink(link, onProgress = null) {
                 if (listData.errno === 0 && listData.list && listData.list.length > 0) {
                     for (const item of listData.list) {
                         if (item.isdir === 1 || item.isdir === '1') {
-                            // Rekursif ke dalam subfolder
                             await scanShareList(item.path, 0);
                         } else {
-                            const cat = determineCategory(item.server_filename, item.category);
-                            const streamUrl = cat === 'video'
-                                ? `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${uk}&shareid=${shareid}&type=M3U8_AUTO_480&fid=${item.fs_id}&sign=${sign}&timestamp=${timestamp}`
-                                : '';
+                            // HANYA AMBIL VIDEO
+                            if (isVideoFile(item.server_filename, item.category)) {
+                                const streamUrl = `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${uk}&shareid=${shareid}&type=M3U8_AUTO_480&fid=${item.fs_id}&sign=${sign}&timestamp=${timestamp}`;
+                                const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
 
-                            const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
-
-                            allFiles.push({
-                                fs_id: String(item.fs_id),
-                                title: item.server_filename || 'file_download',
-                                category: cat,
-                                size: Number(item.size) || 0,
-                                size_formatted: formatSize(item.size),
-                                thumbnail: thumb,
-                                stream_url: streamUrl,
-                                share_url: link,
-                                surl: surl,
-                                dlink: item.dlink || '',
-                                path: item.path || '/',
-                                source_type: 'link',
-                                shareid: String(shareid),
-                                uk: String(uk),
-                                sign: String(sign),
-                                timestamp: Number(timestamp)
-                            });
+                                allFiles.push({
+                                    fs_id: String(item.fs_id),
+                                    title: item.server_filename || 'video_stream.mp4',
+                                    category: 'video',
+                                    size: Number(item.size) || 0,
+                                    size_formatted: formatSize(item.size),
+                                    thumbnail: thumb,
+                                    stream_url: streamUrl,
+                                    share_url: link,
+                                    surl: surl,
+                                    dlink: item.dlink || '',
+                                    path: item.path || '/',
+                                    source_type: 'link',
+                                    shareid: String(shareid),
+                                    uk: String(uk),
+                                    sign: String(sign),
+                                    timestamp: Number(timestamp)
+                                });
+                            }
                         }
                     }
 
@@ -251,39 +240,36 @@ async function fetchLink(link, onProgress = null) {
         }
     }
 
-    // Cek apakah ada item berjenis folder di response root
     const hasDirectory = data.list.some(item => item.isdir === 1 || item.isdir === '1');
 
     if (hasDirectory) {
         await scanShareList('', 1);
     } else {
-        // Single / Multi files langsung di root
         for (const item of data.list) {
-            const cat = determineCategory(item.server_filename, item.category);
-            const streamUrl = cat === 'video' 
-                ? `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${uk}&shareid=${shareid}&type=M3U8_AUTO_480&fid=${item.fs_id}&sign=${sign}&timestamp=${timestamp}`
-                : '';
+            // HANYA AMBIL VIDEO
+            if (isVideoFile(item.server_filename, item.category)) {
+                const streamUrl = `https://www.terabox.app/share/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&uk=${uk}&shareid=${shareid}&type=M3U8_AUTO_480&fid=${item.fs_id}&sign=${sign}&timestamp=${timestamp}`;
+                const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
 
-            const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
-
-            allFiles.push({
-                fs_id: String(item.fs_id),
-                title: item.server_filename || 'file_download',
-                category: cat,
-                size: Number(item.size) || 0,
-                size_formatted: formatSize(item.size),
-                thumbnail: thumb,
-                stream_url: streamUrl,
-                share_url: link,
-                surl: surl,
-                dlink: item.dlink || '',
-                path: item.path || '/',
-                source_type: 'link',
-                shareid: String(shareid),
-                uk: String(uk),
-                sign: String(sign),
-                timestamp: Number(timestamp)
-            });
+                allFiles.push({
+                    fs_id: String(item.fs_id),
+                    title: item.server_filename || 'video_stream.mp4',
+                    category: 'video',
+                    size: Number(item.size) || 0,
+                    size_formatted: formatSize(item.size),
+                    thumbnail: thumb,
+                    stream_url: streamUrl,
+                    share_url: link,
+                    surl: surl,
+                    dlink: item.dlink || '',
+                    path: item.path || '/',
+                    source_type: 'link',
+                    shareid: String(shareid),
+                    uk: String(uk),
+                    sign: String(sign),
+                    timestamp: Number(timestamp)
+                });
+            }
         }
     }
 
@@ -291,7 +277,7 @@ async function fetchLink(link, onProgress = null) {
 }
 
 /**
- * 2. Fetch File Dalam Folder Akun Pengguna dengan Progress Callback
+ * 2. Fetch File Dalam Folder Akun Pengguna (Hanya Simpan & Ekstrak Video)
  */
 async function fetchFolderFiles(folderPath = '/', recursive = true, onProgress = null) {
     const cookie = parseCookieFile();
@@ -318,7 +304,7 @@ async function fetchFolderFiles(folderPath = '/', recursive = true, onProgress =
                 currentDir: currentDir,
                 filesFound: allFiles.length,
                 foldersScanned: scannedFoldersCount,
-                message: `Memindai folder: ${currentDir} (Ditemukan: ${allFiles.length} file)...`
+                message: `Memindai video di folder: ${currentDir} (Ditemukan: ${allFiles.length} video)...`
             });
         }
 
@@ -337,31 +323,33 @@ async function fetchFolderFiles(folderPath = '/', recursive = true, onProgress =
                         await scanDir(item.path);
                     }
                 } else {
-                    const cat = determineCategory(item.server_filename, item.category);
-                    const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
-                    const fullPath = item.path || (currentDir.endsWith('/') ? currentDir + item.server_filename : currentDir + '/' + item.server_filename);
+                    // HANYA AMBIL & SIMPAN FILE BERKATEGORI VIDEO
+                    if (isVideoFile(item.server_filename, item.category)) {
+                        const thumb = item.thumbs ? (item.thumbs.url3 || item.thumbs.url2 || item.thumbs.url1 || item.thumbs.icon) : '';
+                        const fullPath = item.path || (currentDir.endsWith('/') ? currentDir + item.server_filename : currentDir + '/' + item.server_filename);
 
-                    allFiles.push({
-                        fs_id: String(item.fs_id),
-                        title: item.server_filename,
-                        category: cat,
-                        size: Number(item.size) || 0,
-                        size_formatted: formatSize(item.size),
-                        thumbnail: thumb,
-                        stream_url: `https://www.terabox.app/api/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&type=M3U8_AUTO_480&path=${encodeURIComponent(fullPath)}`,
-                        dlink: item.dlink || '',
-                        path: fullPath,
-                        source_type: 'folder'
-                    });
-
-                    if (onProgress && allFiles.length % 5 === 0) {
-                        onProgress({
-                            status: 'scanning',
-                            currentDir: currentDir,
-                            filesFound: allFiles.length,
-                            foldersScanned: scannedFoldersCount,
-                            message: `Menemukan file: ${item.server_filename}`
+                        allFiles.push({
+                            fs_id: String(item.fs_id),
+                            title: item.server_filename,
+                            category: 'video',
+                            size: Number(item.size) || 0,
+                            size_formatted: formatSize(item.size),
+                            thumbnail: thumb,
+                            stream_url: `https://www.terabox.app/api/streaming?app_id=250528&web=1&channel=dubox&clienttype=0&type=M3U8_AUTO_480&path=${encodeURIComponent(fullPath)}`,
+                            dlink: item.dlink || '',
+                            path: fullPath,
+                            source_type: 'folder'
                         });
+
+                        if (onProgress && allFiles.length % 5 === 0) {
+                            onProgress({
+                                status: 'scanning',
+                                currentDir: currentDir,
+                                filesFound: allFiles.length,
+                                foldersScanned: scannedFoldersCount,
+                                message: `Menemukan video: ${item.server_filename}`
+                            });
+                        }
                     }
                 }
             }
@@ -420,5 +408,6 @@ module.exports = {
     fetchFolderFiles,
     fetchAllAccountFiles,
     getAccountFolders,
+    isVideoFile,
     formatSize
 };
