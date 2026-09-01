@@ -212,16 +212,51 @@ function renderFiles(files) {
     }).join('');
 }
 
-// Render Pagination
+// Render Compact Smart Pagination with Ellipsis
 function renderPagination(current, total) {
     if (total <= 1) {
         paginationContainer.innerHTML = '';
         return;
     }
+
     let html = '';
-    for (let i = 1; i <= total; i++) {
-        html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="loadFiles(${i})">${i}</button>`;
+
+    // Tombol Previous
+    if (current > 1) {
+        html += `<button class="page-btn" onclick="loadFiles(${current - 1})" title="Halaman Sebelumnya"><i class="fa-solid fa-chevron-left"></i></button>`;
+    } else {
+        html += `<button class="page-btn disabled" disabled><i class="fa-solid fa-chevron-left"></i></button>`;
     }
+
+    // Smart page range logic (Max 7 page items)
+    const pages = [];
+    if (total <= 7) {
+        for (let i = 1; i <= total; i++) pages.push(i);
+    } else {
+        if (current <= 4) {
+            pages.push(1, 2, 3, 4, 5, '...', total);
+        } else if (current >= total - 3) {
+            pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total);
+        } else {
+            pages.push(1, '...', current - 1, current, current + 1, '...', total);
+        }
+    }
+
+    pages.forEach(p => {
+        if (p === '...') {
+            html += `<span class="page-ellipsis">...</span>`;
+        } else {
+            html += `<button class="page-btn ${p === current ? 'active' : ''}" onclick="loadFiles(${p})">${p}</button>`;
+        }
+    });
+
+    // Tombol Next
+    if (current < total) {
+        html += `<button class="page-btn" onclick="loadFiles(${current + 1})" title="Halaman Selanjutnya"><i class="fa-solid fa-chevron-right"></i></button>`;
+    } else {
+        html += `<button class="page-btn disabled" disabled><i class="fa-solid fa-chevron-right"></i></button>`;
+    }
+
     paginationContainer.innerHTML = html;
 }
 
